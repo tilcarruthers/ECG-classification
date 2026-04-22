@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs
+outputs/runs/*
+!outputs/runs/.gitkeep
+outputs/processed/*
+!outputs/processed/.gitkeep
+outputs/splits/*
+!outputs/splits/.gitkeep
+reports/figures/*
+!reports/figures/.gitkeep
+reports/tables/*
+!reports/tables/.gitkeep
+
+# Logs / checkpoints
+*.log
+*.pt
+*.pth
+*.ckpt
