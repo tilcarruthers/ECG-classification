@@ -1,82 +1,72 @@
 # ECG Beat Classification
 
-A clean, reproducible PyTorch repository for **ECG beat classification** built from an MSc notebook refactor.
+A clean PyTorch repository for **ECG beat classification** built by refactoring an MSc notebook into a reproducible machine learning project.
 
-This repo is intentionally scoped as an **applied ML / research engineering project**, not a clinical system. The goal is to turn an exploratory notebook into a defensible experiment stack with:
+The focus of this repository is not clinical deployment or leaderboard chasing. It is a compact, defensible experiment stack for **beat-level ECG classification** with careful attention to:
 
-- explicit data and segmentation assumptions
-- grouped train/val/test splits to reduce leakage risk
-- reproducible configs and run directories
-- a small, coherent model stack
+- leakage-aware data splitting
+- explicit segmentation assumptions
+- reproducible training runs
+- class imbalance handling
 - honest evaluation and limitations
 
-## Current scope
+## Overview
 
-The repo is set up for **3-class beat classification** after excluding ambiguous / sparse `UNK` beats:
+This project studies **supervised ECG beat classification** using beat segments extracted from longer ECG recordings. The current repository is scoped around a **3-class classification task** after excluding ambiguous or weakly defined `UNK` beats:
 
-- `0` → `NOR`
-- `1` → `SVEB`
-- `2` → `VEB`
+- `0` → `NOR` (normal beat)
+- `1` → `SVEB` (supraventricular ectopic beat)
+- `2` → `VEB` (ventricular ectopic beat)
 
-The original notebook also discussed anomaly detection. In this refactor, the primary task is framed more precisely as:
+The original notebook also touched on “anomaly detection”, but the more accurate framing for the work in this repository is:
 
-> supervised beat-level ECG classification, with optional secondary binary analysis of **normal vs abnormal** beats.
+> **supervised beat-level ECG classification**, with optional secondary analysis of **normal vs abnormal** behaviour.
 
-## What changed from the notebook
+## Why this refactor exists
 
-The notebook mixed together:
+The source notebook contained the entire pipeline in one place: data loading, beat extraction, filtering, splitting, model definitions, training, evaluation, and discussion. That is fine for exploration, but weak for reproducibility and difficult to trust methodologically.
 
-- data loading
-- beat extraction
-- filtering
-- train/validation splitting
-- model definitions
-- training loops
-- evaluation
-- discussion text
+This repository restructures the project into a small, coherent ML codebase with a clear boundary between:
 
-This repo separates those concerns and fixes the most important methodological issues before retraining:
+- reusable source code in `src/`
+- experiment configs in `configs/`
+- runnable entry points in `scripts/`
+- analysis-only notebooks in `notebooks/`
+- saved outputs in `outputs/` and `reports/`
 
-1. **Grouped splits first**
-   - avoid random beat-level train/validation splits that can leak record-level information
+## Methodological focus
 
-2. **Segmentation treated as an explicit design choice**
-   - the original beat extraction logic should be audited, not inherited blindly
-   - segmentation outputs should be sanity-checked before large retrains
+A major goal of this refactor is to avoid building a polished repository around a flawed experimental setup.
 
-3. **Variable-length handling done properly**
-   - recurrent models use sequence lengths and packed sequences
-   - attention masks padded positions
+### 1. Grouped splits instead of naive beat-level splits
 
-4. **Evaluation made more honest**
-   - model selection should rely on validation macro F1 / balanced metrics, not accuracy alone
-   - binary `normal vs abnormal` analysis is computed explicitly from collapsed predictions instead of by subsetting multiclass labels and reusing weighted scores
+A random beat-level split can leak record-specific structure across training and validation. The default workflow in this repo therefore generates **grouped train/validation/test splits**, using `patient_id` when available and falling back to `record_id` otherwise.
 
-## Recommended experiment order
+### 2. Segmentation is treated as a first-class design choice
 
-Do **not** start by adding architectures.
+Beat segmentation is central to the task and easy to get subtly wrong. Rather than freezing the original notebook behaviour without scrutiny, this repo makes segmentation explicit and testable. Multiple strategies are supported so they can be audited visually before large retrains.
 
-Use this order:
+### 3. Variable-length sequences are handled properly
 
-1. `bootstrap_data.py`
-2. `audit_dataset.py`
-3. `make_splits.py`
-4. `build_beat_table.py`
-5. segmentation sanity notebook
-6. baseline training
-7. evaluation cleanup
-8. only then stronger extensions
+The original notebook padded sequences aggressively and used recurrent models in a way that could let padding influence model behaviour. In this refactor, recurrent models consume true sequence lengths, use packed sequences where appropriate, and attention layers can mask padded positions.
 
-## Minimal intended experiment stack
+### 4. Evaluation is intentionally conservative
 
-Keep the story tight:
+The emphasis is on **macro-aware metrics**, per-class reporting, and transparent limitations rather than inflated claims. The repo is designed for a small and credible model comparison, not for overstating performance.
 
-1. `cnn1d_baseline`
-2. `bilstm_baseline`
-3. `bilstm_attention`
-4. `cnn_lstm_final` only if it earns its place under the grouped split
+## Planned experiment stack
 
-## Repository layout
+The architecture scope is intentionally narrow.
+
+### Baselines
+- **1D CNN**
+- **BiLSTM**
+- **BiLSTM + attention**
+
+### Optional stronger final model
+- **CNN-LSTM**, but only if it earns its place under the corrected split policy
+
+## Repository structure
 
 ```text
 ecg-beat-classification/
@@ -94,7 +84,9 @@ ecg-beat-classification/
 └── reports/
 ```
 
-## Installation
+## Getting started
+
+### Installation
 
 ```bash
 python -m venv .venv
@@ -102,82 +94,111 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## Data bootstrap and audit
+### 1) Download and audit the dataset
 
 ```bash
 python scripts/bootstrap_data.py
 python scripts/audit_dataset.py --outdir reports/tables
 ```
 
-## Split generation
-
-Default split policy is grouped by patient when available, otherwise record.
+### 2) Create grouped splits
 
 ```bash
-python scripts/make_splits.py   --group-key patient_id   --val-size 0.15   --test-size 0.15   --seed 42   --outpath outputs/splits/record_splits.csv
+python scripts/make_splits.py \
+  --group-key patient_id \
+  --val-size 0.15 \
+  --test-size 0.15 \
+  --seed 42 \
+  --outpath outputs/splits/record_splits.csv
 ```
 
-## Beat table construction
-
-This creates the main metadata table used for training and analysis.
+### 3) Build the beat table
 
 ```bash
-python scripts/build_beat_table.py   --splits-path outputs/splits/record_splits.csv   --segmentation-method aligned_interval   --min-length 32   --max-length 256   --drop-label 3   --outpath outputs/processed/beat_table.csv
+python scripts/build_beat_table.py \
+  --splits-path outputs/splits/record_splits.csv \
+  --segmentation-method aligned_interval \
+  --min-length 32 \
+  --max-length 256 \
+  --drop-label 3 \
+  --outpath outputs/processed/beat_table.csv
 ```
 
-## Training
+### 4) Train a baseline
 
 ```bash
-python scripts/train.py   --config configs/experiments/cnn1d_baseline.yaml
+python scripts/train.py \
+  --config configs/experiments/cnn1d_baseline.yaml
 ```
 
-Or override paths explicitly:
+### 5) Evaluate a run
 
 ```bash
-python scripts/train.py   --config configs/experiments/bilstm_attention.yaml   --beat-table outputs/processed/beat_table.csv
-```
-
-## Evaluation
-
-```bash
-python scripts/evaluate.py   --run-dir outputs/runs/<timestamp>_bilstm_attention
+python scripts/evaluate.py \
+  --run-dir outputs/runs/<timestamp>_cnn1d_baseline
 ```
 
 ## Notebooks
 
-The notebooks are intentionally thin:
+The notebooks are intentionally thin and analysis-focused:
 
 - `01_dataset_audit.ipynb`
 - `02_segmentation_sanity_checks.ipynb`
 - `03_results_analysis.ipynb`
 
-They should **consume saved outputs** from `outputs/` and `reports/`, not recreate training or core preprocessing logic.
+They are meant to **read saved outputs** from the repo pipeline rather than duplicate model code, training loops, or preprocessing logic.
 
-## What not to claim
+## Current repository status
 
-Do not claim any of the following unless you genuinely validate them later:
+This repository currently provides the refactored project scaffold, data pipeline, model definitions, training/evaluation utilities, and tests.
 
-- patient-level generalisation, unless your grouped split proves it
-- screening utility or clinical readiness
-- anomaly detection in the unsupervised / novelty-detection sense
-- state-of-the-art performance
-- architecture superiority unless every compared model is retrained cleanly under the same corrected split
+The next stage is to retrain the baseline stack cleanly under the grouped split policy and then populate:
 
-## Known open questions to settle before final README/results
+- final metrics tables
+- confusion matrices
+- qualitative plots
+- a completed Results section
 
-- whether the dataset’s beat markers should be treated as beat onsets, beat centres, or interval boundaries
-- whether `aligned_interval` or a centered-window strategy gives the most faithful beat representation
-- whether augmentation helps once the split policy is corrected
-- whether the CNN-LSTM actually outperforms the smaller baseline stack under the new setup
+Until that is done, the repo should be read as a **reproducible experimental framework** rather than a finished benchmark report.
 
-## Suggested final README structure after retraining
+## Evaluation philosophy
 
-1. Project overview
-2. Dataset and label policy
-3. Segmentation and preprocessing
-4. Split strategy and leakage mitigation
-5. Model stack
-6. Evaluation protocol
-7. Results
-8. Limitations
-9. Reproducibility
+The intended evaluation emphasis is:
+
+- **macro F1**
+- **balanced accuracy**
+- per-class precision / recall / F1
+- confusion matrices
+- optional collapsed **normal vs abnormal** analysis
+
+Accuracy alone is not a reliable summary here because of class imbalance.
+
+## Limitations
+
+This project should be interpreted conservatively.
+
+- It is **not** a clinical decision-support system.
+- It does **not** currently claim patient-level generalisation beyond what grouped splits support.
+- It does **not** claim state-of-the-art performance.
+- It does **not** treat exploratory notebook results as final evidence.
+- The final conclusions will depend heavily on the validated segmentation choice and leakage-safe split strategy.
+
+## Roadmap
+
+- validate segmentation strategy with visual sanity checks
+- retrain the baseline stack under grouped splits
+- add final metrics, plots, and error analysis
+- stabilise the experiment configs
+- add CI and pre-commit checks once the training/evaluation flow is fully settled
+
+## Project goals
+
+This repository is meant to signal strong applied ML and research-engineering practice:
+
+- clean PyTorch code
+- reproducible experiments
+- explicit assumptions
+- defensible evaluation
+- limited but coherent model scope
+- honest communication of results and limitations
+
