@@ -1,0 +1,14 @@
+model:
+  name: bilstm_attention
+  input_size: 1
+  hidden_size: 128
+  num_layers: 2
+  dropout: 0.3
+  attention_hidden_size: 128
+
+training:
+  batch_size: 256
+  epochs: 25
+
+data:
+  train_augment: false

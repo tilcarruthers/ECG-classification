@@ -1,0 +1,46 @@
+project:
+  name: ecg-beat-classification
+  seed: 42
+
+data:
+  hf_dataset_id: dpelacani/ecg-led2-cleaned
+  splits_path: outputs/splits/record_splits.csv
+  beat_table_path: outputs/processed/beat_table.csv
+  group_key: patient_id
+  split_column: split
+  label_column: label_mapped
+  drop_labels: [3]
+  allowed_labels: [0, 1, 2]
+  max_length: 256
+  min_length: 32
+  segmentation_method: aligned_interval
+  normalization: zscore_per_beat
+  pad_value: 0.0
+  num_workers: 0
+  train_augment: false
+
+model:
+  name: cnn1d
+  num_classes: 3
+
+training:
+  batch_size: 256
+  epochs: 20
+  learning_rate: 0.001
+  weight_decay: 1.0e-5
+  optimizer: adam
+  scheduler: reduce_on_plateau
+  scheduler_mode: max
+  scheduler_factor: 0.5
+  scheduler_patience: 3
+  early_stopping_patience: 6
+  monitor: val_macro_f1
+  amp: false
+  grad_clip_norm: 1.0
+
+evaluation:
+  positive_labels: [1, 2]
+  save_predictions: true
+
+paths:
+  runs_root: outputs/runs

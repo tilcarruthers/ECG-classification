@@ -1,0 +1,10 @@
+model:
+  name: cnn1d
+  channels: [32, 64, 128]
+  kernel_sizes: [7, 5, 3]
+  dropout: 0.2
+
+training:
+  batch_size: 256
+  epochs: 20
+  learning_rate: 0.001
